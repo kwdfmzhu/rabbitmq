@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:rabbit="http://www.springframework.org/schema/rabbit"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+    http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+    http://www.springframework.org/schema/rabbit
+    http://www.springframework.org/schema/rabbit/spring-rabbit-1.2.xsd">
+
+    <rabbit:connection-factory id="connectionFactory"
+                               addresses="${rabbit.mq.host}"
+                               username="${rabbit.mq.username}" password="${rabbit.mq.password}"
+                               channel-cache-size="15" />
+
+    <rabbit:admin connection-factory="connectionFactory" />
+
+    <bean id="rabbitTemplate" class="org.springframework.amqp.rabbit.core.RabbitTemplate">
+        <constructor-arg ref="connectionFactory"></constructor-arg>
+    </bean>
+
+    <!-- queue 队列声明-->
+    <rabbit:queue name="${mq.ingest.queue}"
+                  durable="true" auto-delete="false" exclusive="false" />
+    <rabbit:queue name="${mq.query.queue}"
+                  durable="true" auto-delete="false" exclusive="false" />
+    <rabbit:queue name="${mq.result.queue}"
+                  durable="true" auto-delete="false" exclusive="false" />
+
+    <!-- exchange queue binging key 绑定 -->
+    <rabbit:direct-exchange name="${mq.exchange}" durable="true" auto-delete="false">
+        <rabbit:bindings>
+            <rabbit:binding queue="${mq.ingest.queue}" key="${mq.ingest.queue}" />
+            <rabbit:binding queue="${mq.query.queue}" key="${mq.query.queue}" />
+            <rabbit:binding queue="${mq.result.queue}" key="${mq.result.queue}" />
+
+        </rabbit:bindings>
+    </rabbit:direct-exchange>
+
+    <bean id="ingestConsumer" class="cn.zkw.common.rabbitmq.mq.IngestConsumer" />
+    <bean id="queryConsumer" class="cn.zkw.common.rabbitmq.mq.QueryConsumer" />
+
+    <rabbit:listener-container
+            connection-factory="connectionFactory" acknowledge="manual" concurrency="${rabbit.listen.number}">
+        <rabbit:listener queue-names="${mq.ingest.queue}" ref="ingestConsumer" />
+        <rabbit:listener queue-names="${mq.query.queue}" ref="queryConsumer" />
+
+    </rabbit:listener-container>
+
+</beans>
